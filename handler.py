@@ -17,8 +17,7 @@ import torch
 import soundfile as sf
 import numpy as np
 
-# Global model instances (loaded once per worker)
-tts_model = None
+# Global model instance (loaded once per worker)
 multilingual_tts_model = None
 
 SUPPORTED_LANGUAGES = {
@@ -46,26 +45,6 @@ SUPPORTED_LANGUAGES = {
     "tr",
     "zh",
 }
-
-
-def load_model():
-    """Load Chatterbox TTS model."""
-    global tts_model
-
-    if tts_model is not None:
-        return tts_model
-
-    print("[Handler] Loading Chatterbox TTS model...")
-
-    from chatterbox.tts import ChatterboxTTS
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"[Handler] Using device: {device}")
-
-    tts_model = ChatterboxTTS.from_pretrained(device=device)
-
-    print("[Handler] Model loaded successfully")
-    return tts_model
 
 
 def load_multilingual_model():
@@ -149,11 +128,20 @@ def handler(job: dict) -> dict:
 
     # Health check - respond immediately without generating audio
     if job_input.get("health_check"):
-        return {
-            "status": "healthy",
-            "message": "Chatterbox TTS handler ready",
-            "model_loaded": tts_model is not None,
-        }
+        # Ensure model is loaded for health check
+        try:
+            load_multilingual_model()
+            return {
+                "status": "healthy",
+                "message": "Chatterbox Multilingual TTS handler ready",
+                "model_loaded": True,
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Model loading failed: {e}",
+                "model_loaded": False,
+            }
 
     # Required: text to synthesize
     text = job_input.get("text", "")
@@ -167,10 +155,14 @@ def handler(job: dict) -> dict:
     # Optional: emotion override (if not in text tags)
     emotion = job_input.get("emotion")
 
-    # Optional: language for multilingual model
-    language_id = job_input.get("language_id")
+    # Optional: language for multilingual model (defaults to "en")
+    language_id = job_input.get("language_id", "en")
     if isinstance(language_id, str):
         language_id = language_id.lower().strip()
+    
+    # Validate language_id
+    if language_id not in SUPPORTED_LANGUAGES:
+        return {"error": f"Unsupported language_id: {language_id}. Supported languages: {', '.join(sorted(SUPPORTED_LANGUAGES))}"
 
     # Optional: generation parameters
     temperature = job_input.get("temperature", 0.7)
@@ -185,12 +177,8 @@ def handler(job: dict) -> dict:
         text = clean_text
 
     try:
-        # Load model (multilingual if language specified and supported)
-        use_multilingual = bool(language_id and language_id in SUPPORTED_LANGUAGES)
-        if language_id and not use_multilingual:
-            return {"error": f"Unsupported language_id: {language_id}"}
-
-        model = load_multilingual_model() if use_multilingual else load_model()
+        # Load multilingual model
+        model = load_multilingual_model()
 
         # Handle reference audio
         ref_audio_path = None
@@ -208,29 +196,25 @@ def handler(job: dict) -> dict:
 
         if ref_audio_path:
             # Voice cloning mode
-            generate_kwargs = {
-                "text": text,
-                "audio_prompt_path": ref_audio_path,
-                "temperature": temperature,
-                "exaggeration": exaggeration,
-                "cfg_weight": cfg_weight,
-            }
-            if use_multilingual:
-                generate_kwargs["language_id"] = language_id
-            audio = model.generate(**generate_kwargs)
+            audio = model.generate(
+                text=text,
+                audio_prompt_path=ref_audio_path,
+                temperature=temperature,
+                exaggeration=exaggeration,
+                cfg_weight=cfg_weight,
+                language_id=language_id,
+            )
             # Clean up temp file
             os.unlink(ref_audio_path)
         else:
             # Default voice mode
-            generate_kwargs = {
-                "text": text,
-                "temperature": temperature,
-                "exaggeration": exaggeration,
-                "cfg_weight": cfg_weight,
-            }
-            if use_multilingual:
-                generate_kwargs["language_id"] = language_id
-            audio = model.generate(**generate_kwargs)
+            audio = model.generate(
+                text=text,
+                temperature=temperature,
+                exaggeration=exaggeration,
+                cfg_weight=cfg_weight,
+                language_id=language_id,
+            )
 
         # Apply speed adjustment if not 1.0
         if speed != 1.0:
@@ -270,12 +254,12 @@ def handler(job: dict) -> dict:
         return {"error": str(e), "traceback": traceback.format_exc()}
 
 
-# Pre-load model on worker start
-print("[Handler] Pre-loading model...")
+# Pre-load multilingual model on worker start
+print("[Handler] Pre-loading multilingual model...")
 try:
-    load_model()
+    load_multilingual_model()
 except Exception as e:
-    print(f"[Handler] Warning: Could not pre-load model: {e}")
+    print(f"[Handler] Warning: Could not pre-load multilingual model: {e}")
 
 # RunPod serverless entry point
 runpod.serverless.start({"handler": handler})

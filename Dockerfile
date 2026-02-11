@@ -44,7 +44,6 @@ RUN pip install --no-cache-dir runpod
 COPY handler.py /app/handler.py
 
 # Pre-download models during build
-RUN python -c "from chatterbox.tts import ChatterboxTTS; print('Downloading Chatterbox model...'); _ = ChatterboxTTS.from_pretrained(device='cpu'); print('Chatterbox model downloaded successfully')"
 RUN python - <<'PY'
 import torch
 
