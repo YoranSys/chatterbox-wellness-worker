@@ -43,8 +43,9 @@ RUN pip install --no-cache-dir runpod
 # Set environment variable to force eager attention implementation
 ENV TRANSFORMERS_ATTN_IMPLEMENTATION=eager
 
-# Copy handler
+# Copy handler and debug script
 COPY handler.py /app/handler.py
+COPY debug_attention.py /app/debug_attention.py
 
 # Pre-download models during build
 RUN python - <<'PY'

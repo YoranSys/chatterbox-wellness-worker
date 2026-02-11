@@ -60,21 +60,6 @@ def load_multilingual_model():
 
     print("[Handler] Loading Chatterbox Multilingual TTS model...")
 
-    # Monkey patch transformers PretrainedConfig to force eager attention
-    from transformers import PretrainedConfig
-
-    original_from_pretrained = PretrainedConfig.from_pretrained
-
-    @classmethod
-    def patched_from_pretrained(cls, *args, **kwargs):
-        # Force eager attention implementation
-        kwargs.setdefault("attn_implementation", "eager")
-        config = original_from_pretrained(*args, **kwargs)
-        config._attn_implementation = "eager"
-        return config
-
-    PretrainedConfig.from_pretrained = patched_from_pretrained
-
     from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -82,8 +67,14 @@ def load_multilingual_model():
 
     multilingual_tts_model = ChatterboxMultilingualTTS.from_pretrained(device=device)
 
-    # Restore original method
-    PretrainedConfig.from_pretrained = original_from_pretrained
+    # Force eager attention on the loaded transformer model
+    if hasattr(multilingual_tts_model, "t3") and hasattr(
+        multilingual_tts_model.t3, "tfmr"
+    ):
+        tfmr = multilingual_tts_model.t3.tfmr
+        if hasattr(tfmr, "config"):
+            tfmr.config._attn_implementation = "eager"
+            print(f"[Handler] Forced transformer attention to eager mode")
 
     print("[Handler] Multilingual model loaded successfully")
     return multilingual_tts_model
