@@ -57,13 +57,15 @@ def load_multilingual_model():
     print("[Handler] Loading Chatterbox Multilingual TTS model...")
 
     from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+    import os
+
+    # Force eager attention implementation to avoid SDPA issues
+    os.environ["TRANSFORMERS_ATTN_IMPLEMENTATION"] = "eager"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[Handler] Using device: {device}")
 
-    multilingual_tts_model = ChatterboxMultilingualTTS.from_pretrained(
-        device=device, attn_implementation="eager"
-    )
+    multilingual_tts_model = ChatterboxMultilingualTTS.from_pretrained(device=device)
 
     print("[Handler] Multilingual model loaded successfully")
     return multilingual_tts_model
