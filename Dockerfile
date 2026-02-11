@@ -40,6 +40,9 @@ RUN pip install --no-cache-dir \
 # Install RunPod SDK
 RUN pip install --no-cache-dir runpod
 
+# Set environment variable to force eager attention implementation
+ENV TRANSFORMERS_ATTN_IMPLEMENTATION=eager
+
 # Copy handler
 COPY handler.py /app/handler.py
 

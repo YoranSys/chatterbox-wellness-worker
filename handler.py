@@ -5,10 +5,14 @@ Text-to-Speech with voice cloning and emotion control
 Based on: https://github.com/geronimi73/runpod_chatterbox
 """
 
+import os
+
+# Force eager attention implementation BEFORE any transformers imports
+os.environ["TRANSFORMERS_ATTN_IMPLEMENTATION"] = "eager"
+
 import runpod
 import base64
 import io
-import os
 import tempfile
 import urllib.request
 from typing import Optional
@@ -57,10 +61,6 @@ def load_multilingual_model():
     print("[Handler] Loading Chatterbox Multilingual TTS model...")
 
     from chatterbox.mtl_tts import ChatterboxMultilingualTTS
-    import os
-
-    # Force eager attention implementation to avoid SDPA issues
-    os.environ["TRANSFORMERS_ATTN_IMPLEMENTATION"] = "eager"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[Handler] Using device: {device}")
