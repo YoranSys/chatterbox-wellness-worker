@@ -159,10 +159,12 @@ def handler(job: dict) -> dict:
     language_id = job_input.get("language_id", "en")
     if isinstance(language_id, str):
         language_id = language_id.lower().strip()
-    
+
     # Validate language_id
     if language_id not in SUPPORTED_LANGUAGES:
-        return {"error": f"Unsupported language_id: {language_id}. Supported languages: {', '.join(sorted(SUPPORTED_LANGUAGES))}"
+        return {
+            "error": f"Unsupported language_id: {language_id}. Supported languages: {', '.join(sorted(SUPPORTED_LANGUAGES))}"
+        }
 
     # Optional: generation parameters
     temperature = job_input.get("temperature", 0.7)
