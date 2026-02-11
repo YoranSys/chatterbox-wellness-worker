@@ -17,8 +17,35 @@ import torch
 import soundfile as sf
 import numpy as np
 
-# Global model instance (loaded once per worker)
+# Global model instances (loaded once per worker)
 tts_model = None
+multilingual_tts_model = None
+
+SUPPORTED_LANGUAGES = {
+    "ar",
+    "da",
+    "de",
+    "el",
+    "en",
+    "es",
+    "fi",
+    "fr",
+    "he",
+    "hi",
+    "it",
+    "ja",
+    "ko",
+    "ms",
+    "nl",
+    "no",
+    "pl",
+    "pt",
+    "ru",
+    "sv",
+    "sw",
+    "tr",
+    "zh",
+}
 
 
 def load_model():
@@ -39,6 +66,26 @@ def load_model():
 
     print("[Handler] Model loaded successfully")
     return tts_model
+
+
+def load_multilingual_model():
+    """Load Chatterbox Multilingual TTS model."""
+    global multilingual_tts_model
+
+    if multilingual_tts_model is not None:
+        return multilingual_tts_model
+
+    print("[Handler] Loading Chatterbox Multilingual TTS model...")
+
+    from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"[Handler] Using device: {device}")
+
+    multilingual_tts_model = ChatterboxMultilingualTTS.from_pretrained(device=device)
+
+    print("[Handler] Multilingual model loaded successfully")
+    return multilingual_tts_model
 
 
 def download_reference_audio(url: str) -> str:
@@ -105,7 +152,7 @@ def handler(job: dict) -> dict:
         return {
             "status": "healthy",
             "message": "Chatterbox TTS handler ready",
-            "model_loaded": tts_model is not None
+            "model_loaded": tts_model is not None,
         }
 
     # Required: text to synthesize
@@ -120,6 +167,11 @@ def handler(job: dict) -> dict:
     # Optional: emotion override (if not in text tags)
     emotion = job_input.get("emotion")
 
+    # Optional: language for multilingual model
+    language_id = job_input.get("language_id")
+    if isinstance(language_id, str):
+        language_id = language_id.lower().strip()
+
     # Optional: generation parameters
     temperature = job_input.get("temperature", 0.7)
     exaggeration = job_input.get("exaggeration", 1.0)
@@ -133,8 +185,12 @@ def handler(job: dict) -> dict:
         text = clean_text
 
     try:
-        # Load model
-        model = load_model()
+        # Load model (multilingual if language specified and supported)
+        use_multilingual = bool(language_id and language_id in SUPPORTED_LANGUAGES)
+        if language_id and not use_multilingual:
+            return {"error": f"Unsupported language_id: {language_id}"}
+
+        model = load_multilingual_model() if use_multilingual else load_model()
 
         # Handle reference audio
         ref_audio_path = None
@@ -152,27 +208,34 @@ def handler(job: dict) -> dict:
 
         if ref_audio_path:
             # Voice cloning mode
-            audio = model.generate(
-                text=text,
-                audio_prompt_path=ref_audio_path,
-                temperature=temperature,
-                exaggeration=exaggeration,
-                cfg_weight=cfg_weight,
-            )
+            generate_kwargs = {
+                "text": text,
+                "audio_prompt_path": ref_audio_path,
+                "temperature": temperature,
+                "exaggeration": exaggeration,
+                "cfg_weight": cfg_weight,
+            }
+            if use_multilingual:
+                generate_kwargs["language_id"] = language_id
+            audio = model.generate(**generate_kwargs)
             # Clean up temp file
             os.unlink(ref_audio_path)
         else:
             # Default voice mode
-            audio = model.generate(
-                text=text,
-                temperature=temperature,
-                exaggeration=exaggeration,
-                cfg_weight=cfg_weight,
-            )
+            generate_kwargs = {
+                "text": text,
+                "temperature": temperature,
+                "exaggeration": exaggeration,
+                "cfg_weight": cfg_weight,
+            }
+            if use_multilingual:
+                generate_kwargs["language_id"] = language_id
+            audio = model.generate(**generate_kwargs)
 
         # Apply speed adjustment if not 1.0
         if speed != 1.0:
             from scipy import signal
+
             # Resample to adjust speed
             original_length = len(audio)
             new_length = int(original_length / speed)
@@ -198,14 +261,13 @@ def handler(job: dict) -> dict:
             "duration_seconds": len(audio) / 24000,
             "text": text,
             "emotion": emotion,
+            "language_id": language_id,
         }
 
     except Exception as e:
         import traceback
-        return {
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }
+
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 # Pre-load model on worker start

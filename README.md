@@ -10,6 +10,7 @@ RunPod Serverless worker for Chatterbox Text-to-Speech with voice cloning.
 - **Voice Cloning** - Clone any voice from a reference audio sample
 - **Emotion Tags** - Control emotion in speech
 - **Speed Control** - Adjust playback speed
+- **Multilingual TTS** - 23 supported languages via `language_id`
 
 ## Deployment on RunPod
 
@@ -95,6 +96,20 @@ Supported emotions: `happy`, `sad`, `angry`, `surprised`, `neutral`, `calm`
 | `speed` | 1.0 | 0.5-2.0 | Playback speed |
 | `cfg_weight` | 0.5 | 0.0-1.0 | Classifier-free guidance |
 
+### Multilingual TTS
+
+```json
+{
+  "input": {
+    "text": "Bonjour, comment ça va? Ceci est un exemple multilingue.",
+    "language_id": "fr"
+  }
+}
+```
+
+Supported `language_id` values:
+`ar`, `da`, `de`, `el`, `en`, `es`, `fi`, `fr`, `he`, `hi`, `it`, `ja`, `ko`, `ms`, `nl`, `no`, `pl`, `pt`, `ru`, `sv`, `sw`, `tr`, `zh`
+
 ## Response Format
 
 ```json
@@ -103,7 +118,8 @@ Supported emotions: `happy`, `sad`, `angry`, `surprised`, `neutral`, `calm`
   "sample_rate": 24000,
   "duration_seconds": 3.5,
   "text": "The synthesized text",
-  "emotion": "happy"
+  "emotion": "happy",
+  "language_id": "fr"
 }
 ```
 
