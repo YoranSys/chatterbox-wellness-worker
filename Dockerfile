@@ -45,7 +45,24 @@ COPY handler.py /app/handler.py
 
 # Pre-download models during build
 RUN python -c "from chatterbox.tts import ChatterboxTTS; print('Downloading Chatterbox model...'); _ = ChatterboxTTS.from_pretrained(device='cpu'); print('Chatterbox model downloaded successfully')"
-RUN python -c "from chatterbox.mtl_tts import ChatterboxMultilingualTTS; print('Downloading Chatterbox multilingual model...'); _ = ChatterboxMultilingualTTS.from_pretrained(device='cpu'); print('Chatterbox multilingual model downloaded successfully')"
+RUN python - <<'PY'
+import torch
+
+_orig_load = torch.load
+
+def _patched_load(*args, **kwargs):
+    kwargs.pop("weights_only", None)
+    kwargs.setdefault("map_location", "cpu")
+    return _orig_load(*args, **kwargs)
+
+torch.load = _patched_load
+
+from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+
+print("Downloading Chatterbox multilingual model...")
+_ = ChatterboxMultilingualTTS.from_pretrained(device="cpu")
+print("Chatterbox multilingual model downloaded successfully")
+PY
 
 # Start handler
 CMD ["python", "-u", "/app/handler.py"]
