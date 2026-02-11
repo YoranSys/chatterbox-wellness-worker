@@ -61,7 +61,9 @@ def load_multilingual_model():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[Handler] Using device: {device}")
 
-    multilingual_tts_model = ChatterboxMultilingualTTS.from_pretrained(device=device)
+    multilingual_tts_model = ChatterboxMultilingualTTS.from_pretrained(
+        device=device, attn_implementation="eager"
+    )
 
     print("[Handler] Multilingual model loaded successfully")
     return multilingual_tts_model
