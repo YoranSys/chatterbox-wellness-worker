@@ -43,8 +43,9 @@ RUN pip install --no-cache-dir runpod
 # Copy handler
 COPY handler.py /app/handler.py
 
-# Pre-download model during build
-RUN python -c "from chatterbox.tts import ChatterboxTTS; print('Downloading Chatterbox model...'); model = ChatterboxTTS.from_pretrained(device='cpu'); print('Model downloaded successfully')"
+# Pre-download models during build
+RUN python -c "from chatterbox.tts import ChatterboxTTS; print('Downloading Chatterbox model...'); _ = ChatterboxTTS.from_pretrained(device='cpu'); print('Chatterbox model downloaded successfully')"
+RUN python -c "from chatterbox.mtl_tts import ChatterboxMultilingualTTS; print('Downloading Chatterbox multilingual model...'); _ = ChatterboxMultilingualTTS.from_pretrained(device='cpu'); print('Chatterbox multilingual model downloaded successfully')"
 
 # Start handler
 CMD ["python", "-u", "/app/handler.py"]
